@@ -18,7 +18,7 @@ const (
 	NoCompression      = gzip.NoCompression
 )
 
-func Gzip(level int) gin.HandlerFunc {
+func Gzip(level int, skip []string) gin.HandlerFunc {
 	var gzPool sync.Pool
 	gzPool.New = func() interface{} {
 		gz, err := gzip.NewWriterLevel(ioutil.Discard, level)
@@ -28,7 +28,7 @@ func Gzip(level int) gin.HandlerFunc {
 		return gz
 	}
 	return func(c *gin.Context) {
-		if !shouldCompress(c.Request) {
+		if !shouldCompress(c.Request, skip) {
 			return
 		}
 
@@ -60,9 +60,14 @@ func (g *gzipWriter) Write(data []byte) (int, error) {
 	return g.writer.Write(data)
 }
 
-func shouldCompress(req *http.Request) bool {
+func shouldCompress(req *http.Request, skip []string) bool {
 	if !strings.Contains(req.Header.Get("Accept-Encoding"), "gzip") {
 		return false
+	}
+	for _, s := range skip {
+		if strings.Contains(req.URL.Path, s) {
+			return false
+		}
 	}
 	extension := filepath.Ext(req.URL.Path)
 	if len(extension) < 4 { // fast path
